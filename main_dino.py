@@ -4,8 +4,7 @@
 # [X] DINO
 # [X] training loop
 # [X] quick review so far
-# [ ] implement superpatch as transform, not as dataset
-# [ ] quick check and review so far
+# [ ] quick check
 # [ ] add kNN evaluation
 # [ ] ...
 # run MultiCrop as usual (no resizing before)
