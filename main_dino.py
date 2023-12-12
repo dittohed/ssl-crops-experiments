@@ -4,7 +4,7 @@
 # [X] DINO
 # [X] training loop
 # [X] quick review so far
-# [ ] quick check
+# [X] add superpatch as alternative
 # [ ] add kNN evaluation
 # [ ] ...
 # run MultiCrop as usual (no resizing before)
@@ -24,11 +24,17 @@ from lightly.transforms.dino_transform import DINOTransform
 
 from src.modules import DINO
 from src.loops import train
-from src.data import FlatImageFolder
+from src.data import FlatImageFolder, SuperpatchDataset, DINOViewTransform
 
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Pretrain using DINO')
+
+    # Superpatch params
+    parser.add_argument('--use_spatch', action='store_true',
+        help='Whether to use superpatches instead of multi-crop for positive pairs.')
+    parser.add_argument('--nn_json_path', default='./local/nns.json', type=str,
+        help='Path to .json with nearest neighbors for each superpatch.')
 
     # Training params
     parser.add_argument('--use_amp', action='store_true',  # TODO
@@ -75,11 +81,21 @@ def main(args):
     np.random.seed(args.seed)
 
     # Prepare data
-    transform = DINOTransform()
-    dataset = FlatImageFolder(
-        args.data_dir,
-        transform=transform
-    )
+    if args.use_spatch:
+        # Use aug settings as for global crops in MultiCrop
+        spatch_transform_1 = DINOViewTransform(solarization_prob=0)
+        spatch_transform_2 = DINOViewTransform(gaussian_blur=0.1)
+        dataset = SuperpatchDataset(
+            args.data_dir,
+            args.nn_json_path,
+            spatch_transform_1,
+            spatch_transform_2
+        )
+    else:
+        dataset = FlatImageFolder(
+            args.data_dir,
+            transform=DINOTransform()
+        )
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -122,7 +138,9 @@ if __name__ == '__main__':
     parser = get_args_parser()
     args = parser.parse_args()
 
-    args.batch_size = 2  # TODO: rm after debugging
+    # TODO: rm after debugging
+    args.batch_size = 2  
+    args.use_spatch = True
 
     if args.use_wandb:
         wandb.init(
