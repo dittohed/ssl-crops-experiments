@@ -1,7 +1,11 @@
 import argparse
+
 import torch
+import numpy as np
 
 from tqdm import tqdm
+from sklearn.metrics import accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
 from lightly.models.utils import update_momentum
 from lightly.utils.scheduler import cosine_schedule
 
@@ -9,12 +13,13 @@ from src.utils import AverageAggregator
 
 
 # TODO: doublecheck
-def train(
+def pretrain(
     model: torch.nn.Module, criterion: torch.nn.Module, 
     loader: torch.utils.data.DataLoader, optimizer: torch.optim.Optimizer, 
     epoch: int, scaler: torch.cuda.amp.grad_scaler.GradScaler, device: torch.device, 
     args: argparse.Namespace
 ) -> dict:
+    model.train()
     avg_loss = AverageAggregator()
     momentum_val = cosine_schedule(epoch, args.n_epochs, 0.996, 1)
 
@@ -43,5 +48,40 @@ def train(
         optimizer.step()
         optimizer.zero_grad()
 
-    log_dict = {'train/loss': avg_loss.item()}
-    return log_dict
+    return avg_loss.item()
+
+
+@torch.no_grad()
+def train_evaluate_knn(
+    model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
+    val_loader: torch.utils.data.DataLoader, device: torch.device
+) -> dict:
+    model.eval()
+
+    loaders = {
+        'train': train_loader,
+        'val': val_loader
+    }
+    data = {
+        'X_train': [],
+        'y_train': [],
+        'X_val': [],
+        'y_val': []
+    }
+
+    for subset, loader in loaders.items():
+        for imgs, labels in loader:
+            imgs = imgs.to(device)
+            data[f'X_{subset}'].append(model(imgs).cpu().numpy())
+            data[f'y_{subset}'].append(labels.cpu().numpy())
+
+    data = {k: np.concatenate(l) for k, l in data.items()}
+
+    estimator = KNeighborsClassifier()
+    estimator.fit(data['X_train'], data['y_train'])
+
+    y_val_pred = estimator.predict(data['X_val'])
+    acc = accuracy_score(data['y_val'], y_val_pred)
+    print(f'kNN val accuracy: {acc:.4f}')
+
+    return acc
