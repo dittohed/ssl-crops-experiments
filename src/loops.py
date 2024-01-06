@@ -21,7 +21,7 @@ def pretrain(
 ) -> dict:
     model.train()
     avg_loss = AverageAggregator()
-    momentum_val = cosine_schedule(epoch, args.n_epochs, 0.996, 1)
+    momentum_val = cosine_schedule(epoch, args.n_epochs, 0.9995, 1)
 
     tqdm_it = tqdm(loader, leave=True)
     tqdm_it.set_description(f'Epoch: [{epoch+1}/{args.n_epochs}]')

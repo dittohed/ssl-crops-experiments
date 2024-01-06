@@ -13,12 +13,17 @@ class DINO(torch.nn.Module):
 
     def __init__(self, backbone, input_dim):
         super().__init__()
+
         self.student_backbone = backbone
         self.student_head = DINOProjectionHead(
-            input_dim, 512, 64, 2048, freeze_last_layer=1
+            input_dim, hidden_dim=1024, output_dim=1024, freeze_last_layer=1
         )
+        
         self.teacher_backbone = copy.deepcopy(backbone)
-        self.teacher_head = DINOProjectionHead(input_dim, 512, 64, 2048)
+        self.teacher_head = DINOProjectionHead(
+            input_dim, hidden_dim=1024, output_dim=1024
+        )
+
         deactivate_requires_grad(self.teacher_backbone)
         deactivate_requires_grad(self.teacher_head)
 

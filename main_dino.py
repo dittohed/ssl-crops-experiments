@@ -1,16 +1,3 @@
-# TODO:
-# [X] args
-# [X] loaders
-# [X] DINO
-# [X] training loop
-# [X] quick review so far
-# [X] add superpatch as alternative
-# [X] add kNN evaluation
-# [ ] set sensible DINO params
-# [ ] ...
-# run MultiCrop as usual (no resizing before)
-
-
 import random
 import argparse
 import wandb
@@ -48,15 +35,9 @@ def get_args_parser():
         backward pass will be calculated.''')
     parser.add_argument('--n_epochs', default=100, type=int, 
         help='Number of epochs of training.')
-    parser.add_argument('--base_lr', default=0.025, type=float,  # TODO
-        help='''Learning rate at the end of linear warmup (highest used during 
-        training).''')
-    parser.add_argument('--warmup_epochs', default=0, type=int,  # TODO
-        help='Number of epochs for the linear learning-rate warm up.')
-    parser.add_argument('--end_lr', type=float, default=1e-6,  # TODO
-        help='''Target lr at the end of optimization. We use a cosine lr 
-        schedule with linear warmup.''')
-    parser.add_argument('--wd', type=float, default=1e-5,  # TODO
+    parser.add_argument('--base_lr', default=0.0005, type=float,
+        help='Final lr = base_lr * batch_size/256')
+    parser.add_argument('--wd', type=float, default=0.4,
         help='Weight decay throughout the training.')
     
     # Other params
@@ -151,10 +132,14 @@ def main(args):
 
     # Prepare other stuff
     criterion = DINOLoss(
-        output_dim=2048,
+        output_dim=1024,
         warmup_teacher_temp_epochs=5
     ).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.base_lr)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), 
+        lr=args.base_lr * args.batch_size/256,
+        weight_decay=args.wd
+    )
     scaler = torch.cuda.amp.GradScaler() if args.use_amp else None
     Path(args.chkpt_dir).mkdir(parents=True, exist_ok=True)
 
